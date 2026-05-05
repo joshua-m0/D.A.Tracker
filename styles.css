@@ -233,3 +233,58 @@ h1 {
   .task-item { flex-wrap: wrap; }
   .progress-row { gap: 14px; }
 }
+
+/* ── Alarm toast ── */
+.alarm-toast {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-80px);
+  z-index: 999;
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-lg);
+  padding: 14px 18px;
+  min-width: 280px;
+  max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .3s ease;
+  opacity: 0;
+}
+.alarm-toast.alarm-show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+.alarm-icon { font-size: 24px; flex-shrink: 0; }
+.alarm-body { flex: 1; min-width: 0; }
+.alarm-title { font-family: var(--font-d); font-size: 15px; font-weight: 800; color: var(--text-1); }
+.alarm-sub { font-size: 13px; color: var(--accent); font-weight: 600; margin-top: 2px; }
+.alarm-dismiss {
+  flex-shrink: 0;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 6px 12px;
+  color: #0f1117;
+  font-family: var(--font-b);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s;
+}
+.alarm-dismiss:hover { background: var(--accent-h); }
+
+/* ── Reminder badge on task item ── */
+.reminder-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid rgba(245,166,35,0.25);
+  border-radius: 99px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
