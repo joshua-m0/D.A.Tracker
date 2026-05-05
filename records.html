@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Records</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#f5a623">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Tracker">
+  <link rel="apple-touch-icon" href="icon-192.svg">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    /* ── View toggle ── */
+    .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:24px; }
+    .seg-group { display:flex; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:4px; gap:4px; }
+    .seg-btn {
+      height:32px; padding:0 14px; border:none; border-radius:var(--r-sm);
+      background:transparent; color:var(--text-3); font-family:var(--font-b);
+      font-size:13px; font-weight:600; cursor:pointer; transition:background .15s,color .15s;
+      white-space:nowrap;
+    }
+    .seg-btn.active { background:var(--accent); color:#0f1117; }
+    .seg-btn:not(.active):hover { color:var(--text-1); background:var(--surface-2); }
+
+    .search-box {
+      flex:1; min-width:160px; height:40px;
+      background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md);
+      padding:0 14px 0 36px; color:var(--text-1); font-family:var(--font-b); font-size:14px;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='%23505769' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:12px center;
+    }
+    .search-box::placeholder { color:var(--text-3); }
+    .search-box:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(245,166,35,.15); }
+
+    .export-btn {
+      height:40px; padding:0 16px; border:1px solid var(--border); border-radius:var(--r-md);
+      background:transparent; color:var(--text-2); font-family:var(--font-b);
+      font-size:13px; font-weight:600; cursor:pointer; transition:all .15s;
+      display:flex; align-items:center; gap:6px; white-space:nowrap;
+    }
+    .export-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .export-btn svg { width:14px; height:14px; }
+
+    /* ── Summary strip ── */
+    .summary-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:28px; }
+    .summary-card {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--r-md); padding:14px 16px;
+    }
+    .summary-label { font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); margin-bottom:6px; }
+    .summary-value { font-family:var(--font-d); font-size:24px; font-weight:800; letter-spacing:-.02em; color:var(--accent); }
+    .summary-sub { font-size:12px; color:var(--text-3); margin-top:2px; }
+    .streak-fire { font-size:20px; vertical-align:middle; margin-right:3px; }
+
+    /* ── Bar chart ── */
+    .chart-card {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--r-lg); padding:20px; margin-bottom:24px;
+    }
+    .chart-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+    .chart-title { font-family:var(--font-d); font-size:16px; font-weight:800; color:var(--text-1); }
+    .chart-range { display:flex; gap:4px; }
+    .range-btn {
+      height:28px; padding:0 10px; border:1px solid var(--border); border-radius:var(--r-sm);
+      background:transparent; color:var(--text-3); font-family:var(--font-b);
+      font-size:12px; font-weight:600; cursor:pointer; transition:all .15s;
+    }
+    .range-btn.active { background:var(--accent); border-color:var(--accent); color:#0f1117; }
+    .range-btn:not(.active):hover { color:var(--text-1); border-color:var(--border-h); }
+    .chart-wrap { position:relative; height:180px; }
+
+    /* ── Best/worst ── */
+    .highlights { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:28px; }
+    .highlight-card {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--r-md); padding:14px 16px;
+    }
+    .highlight-card.best  { border-color:rgba(0,214,143,.3); }
+    .highlight-card.worst { border-color:rgba(255,77,109,.2); }
+    .highlight-label { font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; margin-bottom:6px; }
+    .highlight-card.best  .highlight-label { color:var(--success); }
+    .highlight-card.worst .highlight-label { color:var(--danger); }
+    .highlight-date { font-family:var(--font-d); font-size:15px; font-weight:800; color:var(--text-1); }
+    .highlight-stat { font-size:12px; color:var(--text-3); margin-top:3px; }
+
+    /* ── Day blocks ── */
+    .day-block { margin-bottom:28px; animation:fadeUp .3s ease both; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .day-header {
+      display:flex; align-items:baseline; justify-content:space-between;
+      gap:12px; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border);
+    }
+    .day-date { font-family:var(--font-d); font-size:17px; font-weight:800; color:var(--text-1); }
+    .day-date span { font-size:12px; font-weight:600; font-family:var(--font-b); color:var(--text-3); letter-spacing:.06em; text-transform:uppercase; margin-left:8px; }
+    .day-meta { display:flex; gap:14px; align-items:center; }
+    .day-stat { font-size:12px; font-weight:600; color:var(--text-3); white-space:nowrap; }
+    .day-stat b { color:var(--accent); font-weight:700; }
+    .day-dur { font-size:12px; color:var(--text-3); }
+
+    /* ── Record items ── */
+    .record-list { list-style:none; display:flex; flex-direction:column; gap:6px; }
+    .record-item {
+      display:flex; align-items:center; gap:10px;
+      padding:10px 14px; background:var(--surface);
+      border:1px solid var(--border); border-radius:var(--r-md);
+    }
+    .record-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .record-dot.done   { background:var(--success); box-shadow:0 0 5px var(--success); }
+    .record-dot.missed { background:var(--danger);  box-shadow:0 0 5px var(--danger); }
+    .record-name { flex:1; font-size:14px; font-weight:600; color:var(--text-1); min-width:0; overflow-wrap:anywhere; }
+    .record-item.missed .record-name { color:var(--text-2); }
+    .record-cat {
+      font-size:11px; font-weight:700; padding:2px 8px;
+      border-radius:99px; white-space:nowrap;
+    }
+    .record-time { font-size:12px; color:var(--text-3); font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .record-notes { font-size:12px; color:var(--text-2); font-style:italic; margin-top:2px; }
+    .record-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; white-space:nowrap; }
+    .record-badge.done   { background:var(--success-dim); color:var(--success); }
+    .record-badge.missed { background:var(--danger-dim);  color:var(--danger); }
+    .record-info { flex:1; min-width:0; }
+
+    /* ── Week/month group ── */
+    .period-block { margin-bottom:36px; }
+    .period-header {
+      font-family:var(--font-d); font-size:13px; font-weight:800;
+      color:var(--text-3); letter-spacing:.08em; text-transform:uppercase;
+      margin-bottom:14px; display:flex; align-items:center; gap:10px;
+    }
+    .period-header::after { content:''; flex:1; height:1px; background:var(--border); }
+    .period-summary { font-size:12px; color:var(--text-3); font-family:var(--font-b); text-transform:none; letter-spacing:0; font-weight:500; }
+
+    /* ── Empty ── */
+    .empty-records {
+      text-align:center; padding:64px 20px; color:var(--text-3);
+      border:1px dashed var(--border); border-radius:var(--r-lg);
+    }
+    .empty-records p:first-child { font-family:var(--font-d); font-size:20px; font-weight:800; color:var(--text-2); margin-bottom:8px; }
+    .empty-records p { font-size:14px; }
+
+    .clear-btn {
+      background:transparent; border:1px solid var(--border); border-radius:var(--r-sm);
+      padding:7px 14px; color:var(--text-2); font-family:var(--font-b);
+      font-size:13px; font-weight:500; cursor:pointer; transition:all .15s;
+    }
+    .clear-btn:hover { border-color:rgba(255,77,109,.4); color:var(--danger); }
+
+    @media(max-width:520px){
+      .summary-strip { grid-template-columns:1fr 1fr; }
+      .highlights { grid-template-columns:1fr; }
+      .toolbar { gap:8px; }
+      .search-box { min-width:100%; }
+    }
+  </style>
+</head>
+<body>
+<main class="app">
+  <a href="index.html" class="nav-back">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Back to tracker
+  </a>
+
+  <header class="tracker-header">
+    <div>
+      <p class="eyebrow">History</p>
+      <h1>Activity Records</h1>
+    </div>
+    <button class="clear-btn" id="clearAllBtn">Clear all</button>
+  </header>
+
+  <div class="summary-strip" id="summaryStrip"></div>
+  <div class="highlights" id="highlights"></div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <span class="chart-title">Completion rate</span>
+      <div class="chart-range">
+        <button class="range-btn active" data-days="7">7d</button>
+        <button class="range-btn" data-days="30">30d</button>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="seg-group" id="viewToggle">
+      <button class="seg-btn active" data-view="day">Day</button>
+      <button class="seg-btn" data-view="week">Week</button>
+      <button class="seg-btn" data-view="month">Month</button>
+    </div>
+    <div class="seg-group" id="filterToggle">
+      <button class="seg-btn active" data-filter="all">All</button>
+      <button class="seg-btn" data-filter="done">Done</button>
+      <button class="seg-btn" data-filter="missed">Missed</button>
+    </div>
+    <input class="search-box" id="searchBox" type="text" placeholder="Search activities…">
+    <button class="export-btn" id="exportCsvBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export CSV
+    </button>
+  </div>
+
+  <div id="recordsContainer"></div>
+</main>
+
+<script>
+const RECORDS_KEY = 'activityRecords';
+const ACTIVITIES_KEY = 'dailyActivities';
+const CATEGORIES = {
+  health:   { label:'Health',   color:'#00d68f' },
+  work:     { label:'Work',     color:'#f5a623' },
+  personal: { label:'Personal', color:'#a78bfa' },
+  social:   { label:'Social',   color:'#38bdf8' },
+  other:    { label:'Other',    color:'#8b93a8' }
+};
+
+let currentView   = 'day';
+let currentFilter = 'all';
+let searchQuery   = '';
+let chartDays     = 7;
+let barChartInst  = null;
+
+/* ── Helpers ── */
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function getRecords() {
+  return JSON.parse(localStorage.getItem(RECORDS_KEY) || '{}');
+}
+
+function todayKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function autoSaveToday() {
+  const raw = localStorage.getItem(ACTIVITIES_KEY);
+  if (!raw) return;
+  const acts = JSON.parse(raw);
+  if (!acts.length) return;
+  const records = getRecords();
+  records[todayKey()] = {
+    date: todayKey(), savedAt: new Date().toISOString(),
+    activities: acts.map(function(a){
+      return { name:a.name, startTime:a.startTime, endTime:a.endTime,
+               duration:Number(a.duration)||0, completed:a.completed,
+               category:a.category||'other', notes:a.notes||'' };
+    })
+  };
+  localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
+}
+
+function formatLong(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+}
+
+function formatShort(dateStr) {
+  const d   = new Date(dateStr + 'T00:00:00');
+  const tod = todayKey();
+  const yes = new Date(Date.now()-86400000).toISOString().slice(0,10);
+  if (dateStr === tod) return 'Today';
+  if (dateStr === yes) return 'Yesterday';
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+
+function weekKey(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay();
+  const mon = new Date(d); mon.setDate(d.getDate() - ((day+6)%7));
+  const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+  const fmt = function(x){ return x.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
+  return 'Week of ' + fmt(mon) + ' – ' + fmt(sun);
+}
+
+function monthKey(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+}
+
+function totalMins(acts) {
+  return acts.reduce(function(s,a){ return s + (Number(a.duration)||0); }, 0);
+}
+
+function fmtMins(m) {
+  if (m < 60) return m + 'min';
+  return Math.floor(m/60) + 'h ' + (m%60 ? (m%60) + 'm' : '');
+}
+
+/* ── Streak ── */
+function calcStreak(records) {
+  const keys = Object.keys(records).sort().reverse();
+  let streak = 0;
+  const todayK = todayKey();
+  for (let i = 0; i < keys.length; i++) {
+    const k   = keys[i];
+    const day = records[k];
+    const all = day.activities.length;
+    const done = day.activities.filter(function(a){ return a.completed; }).length;
+    if (all === 0) break;
+    if (done < all && k !== todayK) break;
+    streak++;
+  }
+  return streak;
+}
+
+/* ── Summary ── */
+function renderSummary(records) {
+  const keys = Object.keys(records);
+  let total = 0, completed = 0, mins = 0;
+  keys.forEach(function(k){
+    const d = records[k];
+    d.activities.forEach(function(a){
+      total++; mins += Number(a.duration)||0;
+      if (a.completed) completed++;
+    });
+  });
+  const rate   = total ? Math.round(completed/total*100) : 0;
+  const streak = calcStreak(records);
+
+  document.getElementById('summaryStrip').innerHTML =
+    sc('Days tracked', keys.length, 'total days') +
+    sc('Completion', rate + '%', 'overall rate') +
+    sc('Time tracked', fmtMins(mins), 'total duration') +
+    '<div class="summary-card"><div class="summary-label">Current streak</div>' +
+    '<div class="summary-value">' + (streak > 0 ? '🔥' : '') + streak + 'd</div>' +
+    '<div class="summary-sub">days all done</div></div>';
+}
+
+function sc(label, value, sub) {
+  return '<div class="summary-card"><div class="summary-label">' + label + '</div>' +
+    '<div class="summary-value">' + value + '</div>' +
+    '<div class="summary-sub">' + sub + '</div></div>';
+}
+
+/* ── Best / worst ── */
+function renderHighlights(records) {
+  const keys = Object.keys(records);
+  if (keys.length < 2) { document.getElementById('highlights').innerHTML = ''; return; }
+
+  let best = null, worst = null, bestRate = -1, worstRate = 101;
+
+  keys.forEach(function(k) {
+    const d = records[k];
+    const t = d.activities.length;
+    if (!t) return;
+    const c = d.activities.filter(function(a){ return a.completed; }).length;
+    const r = c/t;
+    if (r > bestRate)  { bestRate  = r; best  = { key:k, c, t }; }
+    if (r < worstRate) { worstRate = r; worst = { key:k, c, t }; }
+  });
+
+  document.getElementById('highlights').innerHTML =
+    (best ? '<div class="highlight-card best"><div class="highlight-label">Best day</div>' +
+      '<div class="highlight-date">' + formatShort(best.key) + '</div>' +
+      '<div class="highlight-stat">' + best.c + '/' + best.t + ' · ' + Math.round(bestRate*100) + '% done</div></div>' : '') +
+    (worst ? '<div class="highlight-card worst"><div class="highlight-label">Worst day</div>' +
+      '<div class="highlight-date">' + formatShort(worst.key) + '</div>' +
+      '<div class="highlight-stat">' + worst.c + '/' + worst.t + ' · ' + Math.round(worstRate*100) + '% done</div></div>' : '');
+}
+
+/* ── Bar chart ── */
+function renderBarChart(records) {
+  const today  = new Date();
+  const labels = [], data = [], colors = [];
+
+  for (let i = chartDays - 1; i >= 0; i--) {
+    const d = new Date(today); d.setDate(today.getDate() - i);
+    const k = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    labels.push(d.toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+    const day = records[k];
+    if (day && day.activities.length) {
+      const done  = day.activities.filter(function(a){ return a.completed; }).length;
+      const rate  = Math.round(done / day.activities.length * 100);
+      data.push(rate);
+      colors.push(rate === 100 ? '#00d68f' : rate >= 50 ? '#f5a623' : '#ff4d6d');
+    } else {
+      data.push(0); colors.push('#2a3045');
+    }
+  }
+
+  if (barChartInst) barChartInst.destroy();
+  const ctx = document.getElementById('barChart').getContext('2d');
+  barChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius: 6, borderSkipped: false }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: function(c){ return c.raw + '% completed'; } },
+        backgroundColor: '#1f2435', titleColor: '#f0f2f8', bodyColor: '#8b93a8',
+        borderColor: '#2a3045', borderWidth: 1
+      }},
+      scales: {
+        x: { grid: { color: '#1f2435' }, ticks: { color: '#505769', font: { family: 'DM Sans', size: 11 } } },
+        y: { min: 0, max: 100, grid: { color: '#1f2435' },
+             ticks: { color: '#505769', font: { family: 'DM Sans', size: 11 },
+                      callback: function(v){ return v + '%'; } } }
+      }
+    }
+  });
+}
+
+/* ── Filter activities ── */
+function filterActs(acts) {
+  return acts.filter(function(a) {
+    if (currentFilter === 'done'   && !a.completed) return false;
+    if (currentFilter === 'missed' &&  a.completed) return false;
+    if (searchQuery && !a.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+}
+
+/* ── Render one activity row ── */
+function recordItemHTML(a) {
+  const status = a.completed ? 'done' : 'missed';
+  const cat    = CATEGORIES[a.category] || CATEGORIES.other;
+  return '<li class="record-item ' + status + '">' +
+    '<div class="record-dot ' + status + '"></div>' +
+    '<div class="record-info">' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+        '<span class="record-name">' + esc(a.name) + '</span>' +
+        '<span class="record-cat" style="background:' + cat.color + '22;color:' + cat.color + ';border:1px solid ' + cat.color + '44;">' + cat.label + '</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-top:2px;">' +
+        '<span class="record-time">' + a.startTime + ' – ' + a.endTime + ' · ' + (a.duration||0) + ' min</span>' +
+        (a.notes ? '<span class="record-notes">' + esc(a.notes) + '</span>' : '') +
+      '</div>' +
+    '</div>' +
+    '<span class="record-badge ' + status + '">' + (a.completed ? 'Done' : 'Missed') + '</span>' +
+    '</li>';
+}
+
+/* ── Day view ── */
+function renderDay(records) {
+  const keys = Object.keys(records).sort().reverse();
+  return keys.map(function(k, i) {
+    const day  = records[k];
+    const acts = filterActs(day.activities);
+    if (!acts.length) return '';
+    const total   = day.activities.length;
+    const done    = day.activities.filter(function(a){ return a.completed; }).length;
+    const mins    = totalMins(day.activities);
+    const delay   = i * 50;
+    return '<div class="day-block" style="animation-delay:' + delay + 'ms">' +
+      '<div class="day-header">' +
+        '<div class="day-date">' + formatShort(k) + '<span>' + formatLong(k).split(',').slice(1).join(',').trim() + '</span></div>' +
+        '<div class="day-meta">' +
+          '<span class="day-dur">' + fmtMins(mins) + '</span>' +
+          '<span class="day-stat"><b>' + done + '</b>/' + total + ' done</span>' +
+        '</div>' +
+      '</div>' +
+      '<ul class="record-list">' + acts.map(recordItemHTML).join('') + '</ul>' +
+      '</div>';
+  }).join('');
+}
+
+/* ── Week view ── */
+function renderWeek(records) {
+  const groups = {};
+  Object.keys(records).sort().forEach(function(k) {
+    const wk = weekKey(k);
+    if (!groups[wk]) groups[wk] = [];
+    groups[wk].push(records[k]);
+  });
+  return Object.keys(groups).reverse().map(function(wk, wi) {
+    const days = groups[wk];
+    const allActs = [].concat.apply([], days.map(function(d){ return d.activities; }));
+    const filtered = filterActs(allActs);
+    if (!filtered.length) return '';
+    const total = allActs.length;
+    const done  = allActs.filter(function(a){ return a.completed; }).length;
+    const rate  = total ? Math.round(done/total*100) : 0;
+    const mins  = totalMins(allActs);
+    const dayBlocks = days.reverse().map(function(day, di) {
+      const acts = filterActs(day.activities);
+      if (!acts.length) return '';
+      const dDone = day.activities.filter(function(a){ return a.completed; }).length;
+      return '<div class="day-block" style="animation-delay:' + (wi*80+di*30) + 'ms;margin-bottom:16px">' +
+        '<div class="day-header">' +
+          '<div class="day-date" style="font-size:14px">' + formatShort(day.date) + '</div>' +
+          '<span class="day-stat"><b>' + dDone + '</b>/' + day.activities.length + '</span>' +
+        '</div>' +
+        '<ul class="record-list">' + acts.map(recordItemHTML).join('') + '</ul>' +
+        '</div>';
+    }).join('');
+    return '<div class="period-block">' +
+      '<div class="period-header">' + wk +
+        '<span class="period-summary">' + rate + '% · ' + fmtMins(mins) + '</span>' +
+      '</div>' + dayBlocks + '</div>';
+  }).join('');
+}
+
+/* ── Month view ── */
+function renderMonth(records) {
+  const groups = {};
+  Object.keys(records).sort().forEach(function(k) {
+    const mk = monthKey(k);
+    if (!groups[mk]) groups[mk] = [];
+    groups[mk].push(records[k]);
+  });
+  return Object.keys(groups).reverse().map(function(mk, mi) {
+    const days = groups[mk];
+    const allActs = [].concat.apply([], days.map(function(d){ return d.activities; }));
+    const filtered = filterActs(allActs);
+    if (!filtered.length) return '';
+    const total = allActs.length;
+    const done  = allActs.filter(function(a){ return a.completed; }).length;
+    const rate  = total ? Math.round(done/total*100) : 0;
+    const mins  = totalMins(allActs);
+    const dayBlocks = days.reverse().map(function(day, di) {
+      const acts = filterActs(day.activities);
+      if (!acts.length) return '';
+      const dDone = day.activities.filter(function(a){ return a.completed; }).length;
+      return '<div class="day-block" style="animation-delay:' + (mi*80+di*20) + 'ms;margin-bottom:16px">' +
+        '<div class="day-header">' +
+          '<div class="day-date" style="font-size:14px">' + formatShort(day.date) + '</div>' +
+          '<span class="day-stat"><b>' + dDone + '</b>/' + day.activities.length + '</span>' +
+        '</div>' +
+        '<ul class="record-list">' + acts.map(recordItemHTML).join('') + '</ul>' +
+        '</div>';
+    }).join('');
+    return '<div class="period-block">' +
+      '<div class="period-header">' + mk +
+        '<span class="period-summary">' + rate + '% · ' + fmtMins(mins) + ' · ' + days.length + ' days</span>' +
+      '</div>' + dayBlocks + '</div>';
+  }).join('');
+}
+
+/* ── Main render ── */
+function render() {
+  const records = getRecords();
+  const keys    = Object.keys(records);
+
+  renderSummary(records);
+  renderHighlights(records);
+  renderBarChart(records);
+
+  const container = document.getElementById('recordsContainer');
+  if (!keys.length) {
+    container.innerHTML =
+      '<div class="empty-records"><p>No records yet</p>' +
+      '<p>Records are saved automatically. Come back tomorrow to see today\'s activities here, or add activities on the tracker.</p></div>';
+    return;
+  }
+
+  let html = '';
+  if (currentView === 'day')   html = renderDay(records);
+  if (currentView === 'week')  html = renderWeek(records);
+  if (currentView === 'month') html = renderMonth(records);
+
+  container.innerHTML = html ||
+    '<div class="empty-records"><p>Nothing to show</p><p>Try a different filter or search term.</p></div>';
+}
+
+/* ── Export CSV ── */
+function exportCSV() {
+  const records = getRecords();
+  const keys    = Object.keys(records).sort();
+  const rows    = [['Date','Activity','Category','Start','End','Duration (min)','Completed','Notes']];
+  keys.forEach(function(k) {
+    records[k].activities.forEach(function(a) {
+      rows.push([k, a.name, a.category||'other', a.startTime, a.endTime,
+                 a.duration||0, a.completed ? 'Yes' : 'No', a.notes||'']);
+    });
+  });
+  const csv  = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+  const blob = new Blob([csv], { type:'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a'); a.href = url;
+  a.download = 'activity-records-' + todayKey() + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+/* ── Events ── */
+document.querySelectorAll('#viewToggle .seg-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('#viewToggle .seg-btn').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    currentView = btn.dataset.view;
+    render();
+  });
+});
+
+document.querySelectorAll('#filterToggle .seg-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('#filterToggle .seg-btn').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    render();
+  });
+});
+
+document.querySelectorAll('.range-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.range-btn').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    chartDays = Number(btn.dataset.days);
+    renderBarChart(getRecords());
+  });
+});
+
+document.getElementById('searchBox').addEventListener('input', function(e) {
+  searchQuery = e.target.value.trim();
+  render();
+});
+
+document.getElementById('exportCsvBtn').addEventListener('click', exportCSV);
+
+document.getElementById('clearAllBtn').addEventListener('click', function() {
+  if (confirm('Delete all activity records? This cannot be undone.')) {
+    localStorage.removeItem(RECORDS_KEY);
+    render();
+  }
+});
+
+autoSaveToday();
+render();
+setInterval(autoSaveToday, 60000);
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js')
+    .catch(function(err) { console.log('SW error:', err); });
+}
+</script>
+</body>
+</html>
