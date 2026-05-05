@@ -4,6 +4,7 @@ const activityStartInput  = document.querySelector("#activityStartTime");
 const activityDurInput    = document.querySelector("#activityDuration");
 const activityCatInput    = document.querySelector("#activityCategory");
 const activityNotesInput  = document.querySelector("#activityNotes");
+const activityReminderInput = document.querySelector("#activityReminder");
 const taskList            = document.querySelector("#taskList");
 const emptyMessage        = document.querySelector("#emptyMessage");
 const progressText        = document.querySelector("#progressText");
@@ -11,11 +12,17 @@ const progressFill        = document.querySelector("#progressFill");
 const resetButton         = document.querySelector("#resetButton");
 const addButton           = document.querySelector(".add-button");
 const clockEl             = document.querySelector("#liveClock");
+const alarmToast          = document.querySelector("#alarmToast");
+const alarmTitle          = document.querySelector("#alarmTitle");
+const alarmSub            = document.querySelector("#alarmSub");
+const alarmDismiss        = document.querySelector("#alarmDismiss");
 
-const STORAGE_KEY  = "dailyActivities";
-const RECORDS_KEY  = "activityRecords";
-const activities   = [];
-let editingIndex   = null;
+const STORAGE_KEY = "dailyActivities";
+const RECORDS_KEY = "activityRecords";
+const activities  = [];
+let editingIndex  = null;
+let alarmTimeouts = [];   // track scheduled alarms so we can cancel on edit/delete
+let audioCtx      = null; // Web Audio context — created on first user gesture
 
 const CATEGORIES = {
   health:   { label: "Health",   color: "#00d68f" },
@@ -24,6 +31,101 @@ const CATEGORIES = {
   social:   { label: "Social",   color: "#38bdf8" },
   other:    { label: "Other",    color: "#8b93a8" }
 };
+
+/* ── Audio ── */
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+// Unlock audio on first tap/click (required by browsers)
+document.addEventListener("click", function() { getAudioCtx(); }, { once: true });
+
+function playAlarm() {
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === "suspended") ctx.resume();
+
+    // Three rising beeps
+    [0, 0.35, 0.7].forEach(function(offset, i) {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.type = "sine";
+      osc.frequency.value = 880 + i * 220;   // 880, 1100, 1320 Hz
+
+      gain.gain.setValueAtTime(0, ctx.currentTime + offset);
+      gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + offset + 0.05);
+      gain.gain.linearRampToValueAtTime(0,   ctx.currentTime + offset + 0.28);
+
+      osc.start(ctx.currentTime + offset);
+      osc.stop(ctx.currentTime + offset + 0.3);
+    });
+  } catch(e) {
+    console.warn("Audio error:", e);
+  }
+}
+
+function showAlarmToast(name, minutesBefore) {
+  if (!alarmToast) return;
+  alarmTitle.textContent = "⏰ " + name;
+  alarmSub.textContent   = minutesBefore === 0
+    ? "Starting now!"
+    : "Starts in " + minutesBefore + " minute" + (minutesBefore === 1 ? "" : "s");
+  alarmToast.style.display = "flex";
+  alarmToast.classList.add("alarm-show");
+
+  // Auto-hide after 10 seconds
+  setTimeout(function() { hideAlarmToast(); }, 10000);
+}
+
+function hideAlarmToast() {
+  if (!alarmToast) return;
+  alarmToast.classList.remove("alarm-show");
+  setTimeout(function() { alarmToast.style.display = "none"; }, 300);
+}
+
+if (alarmDismiss) {
+  alarmDismiss.addEventListener("click", hideAlarmToast);
+}
+
+/* ── Schedule alarms ── */
+function clearAllAlarms() {
+  alarmTimeouts.forEach(function(id) { clearTimeout(id); });
+  alarmTimeouts = [];
+}
+
+function scheduleAlarms() {
+  clearAllAlarms();
+  const now = new Date();
+  const nowMs = now.getTime();
+
+  activities.forEach(function(a) {
+    if (!a.reminder || Number(a.reminder) < 0) return;
+    if (a.completed) return;
+
+    const reminderMins = Number(a.reminder);
+
+    // Calculate today's alarm time in ms
+    const parts = a.startTime.split(":");
+    const alarmDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
+      Number(parts[0]), Number(parts[1]) - reminderMins, 0);
+    const delay = alarmDate.getTime() - nowMs;
+
+    if (delay < 0) return; // already passed today
+
+    const id = setTimeout(function() {
+      if (!a.completed) {
+        playAlarm();
+        showAlarmToast(a.name, reminderMins);
+      }
+    }, delay);
+
+    alarmTimeouts.push(id);
+  });
+}
 
 /* ── Live clock ── */
 function updateClock() {
@@ -49,26 +151,20 @@ function updateDonut() {
   const cx = sz/2, cy = sz/2, r = sz*0.36, lw = sz*0.13;
 
   ctx.clearRect(0, 0, sz, sz);
-
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI*2);
-  ctx.strokeStyle = "#1f2435";
-  ctx.lineWidth = lw;
-  ctx.stroke();
+  ctx.strokeStyle = "#1f2435"; ctx.lineWidth = lw; ctx.stroke();
 
   if (pct > 0) {
     ctx.beginPath();
     ctx.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + Math.PI*2*pct);
     ctx.strokeStyle = pct === 1 ? "#00d68f" : "#f5a623";
-    ctx.lineWidth = lw;
-    ctx.lineCap = "round";
-    ctx.stroke();
+    ctx.lineWidth = lw; ctx.lineCap = "round"; ctx.stroke();
   }
 
   ctx.fillStyle = "#f0f2f8";
   ctx.font = "bold " + Math.round(sz*0.18) + "px Syne,sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText(Math.round(pct*100) + "%", cx, cy - sz*0.04);
   ctx.fillStyle = "#505769";
   ctx.font = Math.round(sz*0.1) + "px DM Sans,sans-serif";
@@ -80,24 +176,19 @@ function getNow() {
   const n = new Date();
   return String(n.getHours()).padStart(2,"0") + ":" + String(n.getMinutes()).padStart(2,"0");
 }
-
-function toMins(t) {
-  const p = t.split(":"); return Number(p[0])*60 + Number(p[1]);
-}
-
+function toMins(t) { const p = t.split(":"); return Number(p[0])*60 + Number(p[1]); }
 function fromMins(m) {
   const t = m % (24*60);
   return String(Math.floor(t/60)).padStart(2,"0") + ":" + String(t%60).padStart(2,"0");
 }
-
 function endTime(start, dur) { return fromMins(toMins(start) + Number(dur)); }
-
 function isOverdue(a) { return a.endTime < getNow() && !a.completed; }
 
 /* ── Storage ── */
 function saveActivities() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(activities));
   saveTodayRecord();
+  scheduleAlarms();
 }
 
 function loadActivities() {
@@ -111,7 +202,8 @@ function loadActivities() {
       endTime: a.endTime || endTime(st, du),
       completed: a.completed,
       category: a.category || "other",
-      notes: a.notes || ""
+      notes: a.notes || "",
+      reminder: a.reminder !== undefined ? a.reminder : ""
     });
   });
 }
@@ -127,12 +219,12 @@ function todayKey() {
 function saveTodayRecord() {
   const records = JSON.parse(localStorage.getItem(RECORDS_KEY) || "{}");
   records[todayKey()] = {
-    date: todayKey(),
-    savedAt: new Date().toISOString(),
+    date: todayKey(), savedAt: new Date().toISOString(),
     activities: activities.map(function(a) {
       return { name: a.name, startTime: a.startTime, endTime: a.endTime,
                duration: a.duration, completed: a.completed,
-               category: a.category || "other", notes: a.notes || "" };
+               category: a.category || "other", notes: a.notes || "",
+               reminder: a.reminder || "" };
     })
   };
   localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
@@ -155,7 +247,7 @@ function updateProgress() {
   updateDonut();
 }
 
-/* ── Edit/Delete ── */
+/* ── Edit / Delete ── */
 function cancelEdit() {
   editingIndex = null;
   addButton.textContent = "Add Activity";
@@ -170,8 +262,9 @@ function startEdit(i) {
   activityNameInput.value  = a.name;
   activityStartInput.value = a.startTime;
   activityDurInput.value   = a.duration;
-  if (activityCatInput)   activityCatInput.value   = a.category || "other";
-  if (activityNotesInput) activityNotesInput.value = a.notes || "";
+  if (activityCatInput)      activityCatInput.value      = a.category || "other";
+  if (activityNotesInput)    activityNotesInput.value    = a.notes || "";
+  if (activityReminderInput) activityReminderInput.value = a.reminder !== "" ? a.reminder : "";
   addButton.textContent = "Save Changes";
   addButton.classList.add("save-button");
   activityNameInput.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -186,10 +279,11 @@ function deleteActivity(i) {
   saveActivities(); showActivities();
 }
 
-function saveEdit(name, start, dur, cat, notes) {
+function saveEdit(name, start, dur, cat, notes, reminder) {
   const a = activities[editingIndex];
   a.name = name; a.startTime = start; a.duration = dur;
-  a.endTime = endTime(start, dur); a.category = cat; a.notes = notes;
+  a.endTime = endTime(start, dur); a.category = cat;
+  a.notes = notes; a.reminder = reminder;
   cancelEdit(); sortByTime(); saveActivities(); showActivities();
 }
 
@@ -201,7 +295,6 @@ function createItem(activity, i) {
     (isOverdue(activity) ? " task-overdue" : "") +
     (editingIndex === i ? " task-editing" : "");
 
-  // Label + checkbox
   const label = document.createElement("label");
   label.style.cssText = "display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0;cursor:pointer;";
 
@@ -212,7 +305,6 @@ function createItem(activity, i) {
   const details = document.createElement("span");
   details.className = "task-details";
 
-  // Name + badge row
   const nameRow = document.createElement("span");
   nameRow.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap;";
 
@@ -225,6 +317,14 @@ function createItem(activity, i) {
   badge.style.cssText = "background:" + cat.color + "22;color:" + cat.color + ";border:1px solid " + cat.color + "44;";
 
   nameRow.appendChild(nameEl); nameRow.appendChild(badge);
+
+  // Reminder badge
+  if (activity.reminder !== "" && activity.reminder !== null && activity.reminder !== undefined) {
+    const remBadge = document.createElement("span");
+    remBadge.className = "reminder-badge";
+    remBadge.textContent = "🔔 " + activity.reminder + "min before";
+    nameRow.appendChild(remBadge);
+  }
 
   const timeEl = document.createElement("span");
   timeEl.className = "task-time";
@@ -240,7 +340,6 @@ function createItem(activity, i) {
 
   label.appendChild(cb); label.appendChild(details);
 
-  // Action buttons
   const actions = document.createElement("div");
   actions.className = "task-actions";
 
@@ -270,25 +369,30 @@ function sortByTime() {
   activities.sort(function(a, b){ return a.startTime.localeCompare(b.startTime); });
 }
 
-function addActivity(name, start, dur, cat, notes) {
+function addActivity(name, start, dur, cat, notes, reminder) {
   activities.push({ name, startTime: start, duration: dur,
-    endTime: endTime(start, dur), completed: false, category: cat, notes });
+    endTime: endTime(start, dur), completed: false,
+    category: cat, notes, reminder });
   sortByTime(); saveActivities(); showActivities();
 }
 
-/* ── Events ── */
+/* ── Form submit ── */
 activityForm.addEventListener("submit", function(e) {
   e.preventDefault();
-  const name  = activityNameInput.value.trim();
-  const start = activityStartInput.value;
-  const dur   = Number(activityDurInput.value);
-  const cat   = activityCatInput ? activityCatInput.value : "other";
-  const notes = activityNotesInput ? activityNotesInput.value.trim() : "";
+  const name     = activityNameInput.value.trim();
+  const start    = activityStartInput.value;
+  const dur      = Number(activityDurInput.value);
+  const cat      = activityCatInput ? activityCatInput.value : "other";
+  const notes    = activityNotesInput ? activityNotesInput.value.trim() : "";
+  const reminder = activityReminderInput && activityReminderInput.value !== ""
+    ? Number(activityReminderInput.value) : "";
+
   if (!name || !start || dur <= 0) return;
+
   if (editingIndex !== null) {
-    saveEdit(name, start, dur, cat, notes);
+    saveEdit(name, start, dur, cat, notes, reminder);
   } else {
-    addActivity(name, start, dur, cat, notes);
+    addActivity(name, start, dur, cat, notes, reminder);
     activityForm.reset(); activityNameInput.focus();
   }
 });
@@ -300,5 +404,6 @@ resetButton.addEventListener("click", function() {
 });
 
 loadActivities(); sortByTime(); showActivities();
+scheduleAlarms();
 setInterval(showActivities, 60000);
 scheduleEndOfDaySave();
