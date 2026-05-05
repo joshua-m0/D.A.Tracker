@@ -44,6 +44,16 @@
       </div>
     </div>
 
+    <!-- Alarm toast -->
+    <div class="alarm-toast" id="alarmToast" style="display:none;">
+      <div class="alarm-icon">🔔</div>
+      <div class="alarm-body">
+        <div class="alarm-title" id="alarmTitle"></div>
+        <div class="alarm-sub" id="alarmSub"></div>
+      </div>
+      <button class="alarm-dismiss" id="alarmDismiss">Dismiss</button>
+    </div>
+
     <!-- Form -->
     <form class="activity-form" id="activityForm">
       <div class="form-row-top">
@@ -70,6 +80,10 @@
         <div class="form-field">
           <label for="activityDuration">Duration (min)</label>
           <input type="number" id="activityDuration" min="1" step="1" placeholder="60" required>
+        </div>
+        <div class="form-field">
+          <label for="activityReminder">Remind (min before)</label>
+          <input type="number" id="activityReminder" min="0" step="1" placeholder="e.g. 10">
         </div>
         <div class="form-field form-field--grow">
           <label for="activityNotes">Notes (optional)</label>
