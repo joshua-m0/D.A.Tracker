@@ -1,4 +1,4 @@
-const CACHE = 'activity-tracker-v1';
+const CACHE = 'activity-tracker-v2';
 const ASSETS = [
   './index.html',
   './records.html',
@@ -11,7 +11,7 @@ const ASSETS = [
   'https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap'
 ];
 
-/* Install — cache all assets */
+/* ── Install — cache all assets ── */
 self.addEventListener('install', function(e) {
   e.waitUntil(
     caches.open(CACHE).then(function(cache) {
@@ -24,7 +24,7 @@ self.addEventListener('install', function(e) {
   );
 });
 
-/* Activate — clean up old caches */
+/* ── Activate — clean up old caches ── */
 self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(keys) {
@@ -38,7 +38,7 @@ self.addEventListener('activate', function(e) {
   );
 });
 
-/* Fetch — cache first, then network */
+/* ── Fetch — cache first, then network ── */
 self.addEventListener('fetch', function(e) {
   e.respondWith(
     caches.match(e.request).then(function(cached) {
@@ -51,9 +51,42 @@ self.addEventListener('fetch', function(e) {
         });
         return response;
       }).catch(function() {
-        /* Offline fallback */
         return caches.match('./index.html');
       });
+    })
+  );
+});
+
+/* ── Push notifications ── */
+self.addEventListener('push', function(e) {
+  let data = { title: 'Activity Reminder', body: 'Time to check your activities!' };
+  if (e.data) {
+    try { data = e.data.json(); } catch(_) { data.body = e.data.text(); }
+  }
+  const options = {
+    body: data.body,
+    icon: './icon-192.svg',
+    badge: './icon-192.svg',
+    vibrate: [200, 100, 200],
+    tag: 'activity-reminder',
+    renotify: true,
+    data: { url: data.url || './index.html' }
+  };
+  e.waitUntil(self.registration.showNotification(data.title, options));
+});
+
+/* ── Notification click — open / focus the app ── */
+self.addEventListener('notificationclick', function(e) {
+  e.notification.close();
+  const target = (e.notification.data && e.notification.data.url) || './index.html';
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].url.includes('index.html') && 'focus' in list[i]) {
+          return list[i].focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(target);
     })
   );
 });
