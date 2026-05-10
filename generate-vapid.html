@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VAPID Key Generator — D.A.Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: #0f1117; color: #f0f2f8;
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; padding: 24px;
+    }
+    .card {
+      width: min(100%, 560px);
+      background: #181c27; border: 1px solid #2a3045;
+      border-radius: 14px; padding: 32px;
+    }
+    h1 { font-size: 22px; font-weight: 800; color: #f5a623; margin-bottom: 8px; }
+    p  { font-size: 14px; color: #8b93a8; line-height: 1.6; margin-bottom: 24px; }
+    button {
+      width: 100%; height: 48px; background: #f5a623; border: none;
+      border-radius: 8px; color: #0f1117; font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: background .15s;
+    }
+    button:hover { background: #ffc04d; }
+    .keys { display: none; margin-top: 24px; }
+    .key-block { margin-bottom: 16px; }
+    label {
+      display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; color: #505769; margin-bottom: 6px;
+    }
+    .key-val {
+      background: #0f1117; border: 1px solid #2a3045; border-radius: 8px;
+      padding: 12px 14px; font-family: monospace; font-size: 12px;
+      color: #00d68f; word-break: break-all; cursor: pointer;
+      transition: border-color .15s;
+    }
+    .key-val:hover { border-color: #f5a623; }
+    .hint { font-size: 12px; color: #505769; margin-top: 6px; }
+    .step {
+      background: #1f2435; border: 1px solid #2a3045; border-radius: 10px;
+      padding: 16px; margin-top: 20px; font-size: 13px; line-height: 1.7;
+      color: #8b93a8;
+    }
+    .step b { color: #f0f2f8; }
+    .step code {
+      background: #0f1117; border-radius: 4px; padding: 1px 6px;
+      font-family: monospace; font-size: 12px; color: #f5a623;
+    }
+    .copied { color: #f5a623 !important; font-size: 11px; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>🔑 VAPID Key Generator</h1>
+  <p>Generate your free VAPID keys for Web Push notifications in D.A.Tracker. These keys identify your app when sending push notifications to iPhone users.</p>
+
+  <button id="generateBtn">Generate VAPID Keys</button>
+
+  <div class="keys" id="keysSection">
+    <div class="key-block">
+      <label>Public Key (goes in index.html)</label>
+      <div class="key-val" id="pubKey" title="Click to copy">—</div>
+      <div class="hint" id="pubHint">Click the key to copy it</div>
+    </div>
+    <div class="key-block">
+      <label>Private Key (keep secret — goes on your server)</label>
+      <div class="key-val" id="privKey" title="Click to copy">—</div>
+      <div class="hint" id="privHint">Click the key to copy it</div>
+    </div>
+
+    <div class="step">
+      <b>What to do with these keys:</b><br><br>
+      1. Copy the <b>Public Key</b> and paste it into <code>index.html</code>:<br>
+      <code>var VAPID_PUBLIC_KEY = 'PASTE_PUBLIC_KEY_HERE';</code><br><br>
+      2. Store the <b>Private Key</b> safely on your backend server (e.g. Render, Railway, Firebase Functions).<br><br>
+      3. Your server uses both keys when calling the Web Push API to send notifications.<br><br>
+      <b>Note:</b> Without a backend server, your app will still show <b>in-app alarm toasts</b> (already working) — the Web Push keys are only needed for notifications when the app is closed.
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('generateBtn').addEventListener('click', async function() {
+    const keyPair = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      ['deriveKey', 'deriveBits']
+    );
+
+    // Export public key as Base64url
+    const pubRaw  = await crypto.subtle.exportKey('raw', keyPair.publicKey);
+    const privRaw = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+
+    const pubB64  = btoa(String.fromCharCode(...new Uint8Array(pubRaw)))
+      .replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+    const privB64 = btoa(String.fromCharCode(...new Uint8Array(privRaw)))
+      .replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+
+    document.getElementById('pubKey').textContent  = pubB64;
+    document.getElementById('privKey').textContent = privB64;
+    document.getElementById('keysSection').style.display = 'block';
+  });
+
+  function copyKey(elId, hintId) {
+    const val = document.getElementById(elId).textContent;
+    navigator.clipboard.writeText(val).then(function() {
+      const hint = document.getElementById(hintId);
+      hint.textContent = '✓ Copied!';
+      hint.classList.add('copied');
+      setTimeout(function() {
+        hint.textContent = 'Click the key to copy it';
+        hint.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
+  document.getElementById('pubKey').addEventListener('click',  function() { copyKey('pubKey',  'pubHint'); });
+  document.getElementById('privKey').addEventListener('click', function() { copyKey('privKey', 'privHint'); });
+</script>
+</body>
+</html>
