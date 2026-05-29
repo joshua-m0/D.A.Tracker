@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — D.A.Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#f5a623">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- Anti-flash: apply theme + accent before first paint -->
+  <script>
+    (function(){
+      try {
+        var s = JSON.parse(localStorage.getItem('daTrackerSettings') || '{}');
+        var accent = s.accent || '#f5a623';
+        var theme  = s.theme  || 'dark';
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var dark = theme === 'dark' || (theme === 'system' && prefersDark);
+        if (!dark) document.documentElement.classList.add('theme-light-early');
+        document.documentElement.style.setProperty('--accent', accent);
+        document.documentElement.style.setProperty('--accent-dim', accent + '22');
+        if (s.fontSize) document.documentElement.style.fontSize = s.fontSize + 'px';
+      } catch(_){}
+    })();
+  </script>
+
+  <style>
+    /* light-theme now lives in styles.css — no duplicate needed */
+
+    .settings-section { margin-bottom: 32px; }
+    .section-title { font-family: var(--font-d); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .setting-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
+    .setting-row { display: flex; align-items: center; gap: 14px; padding: 15px 18px; border-bottom: 1px solid var(--border); transition: background .15s; }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-row:hover { background: var(--surface-2); }
+    .setting-icon { font-size: 18px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); flex-shrink: 0; }
+    .setting-label { flex: 1; min-width: 0; }
+    .setting-label-text { font-size: 14px; font-weight: 600; color: var(--text-1); margin-bottom: 2px; }
+    .setting-label-sub { font-size: 12px; color: var(--text-3); }
+
+    /* ── Toggle ── */
+    .toggle { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track { position: absolute; inset: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: 99px; cursor: pointer; transition: background .2s, border-color .2s; }
+    .toggle-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: var(--text-3); border-radius: 50%; transition: transform .2s cubic-bezier(.34,1.56,.64,1), background .2s; }
+    .toggle input:checked + .toggle-track { background: var(--accent); border-color: var(--accent); }
+    .toggle input:checked + .toggle-track::after { transform: translateX(18px); background: #0f1117; }
+
+    /* ── Controls ── */
+    .setting-select { height: 34px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0 28px 0 10px; color: var(--text-1); font-family: var(--font-b); font-size: 13px; font-weight: 500; appearance: none; -webkit-appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23505769' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; transition: border-color .15s; flex-shrink: 0; }
+    .setting-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245,166,35,.15); }
+    .setting-input { width: 80px; height: 34px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0 10px; color: var(--text-1); font-family: var(--font-b); font-size: 13px; font-weight: 500; flex-shrink: 0; transition: border-color .15s; }
+    .setting-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245,166,35,.15); }
+
+    /* ── Theme buttons ── */
+    .theme-options { display: flex; gap: 8px; flex-shrink: 0; }
+    .theme-btn { height: 34px; padding: 0 14px; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--bg); color: var(--text-2); font-family: var(--font-b); font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; }
+    .theme-btn.active { background: var(--accent); border-color: var(--accent); color: #0f1117; }
+    .theme-btn:not(.active):hover { border-color: var(--border-h); color: var(--text-1); }
+
+    /* ── Swatches ── */
+    .swatch-row { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
+    .swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform .15s, border-color .15s; position: relative; }
+    .swatch:hover { transform: scale(1.15); }
+    .swatch.active { border-color: var(--text-1); }
+    .swatch.active::after { content: '✓'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #0f1117; }
+
+    /* ── Action buttons ── */
+    .action-btn { height: 34px; padding: 0 16px; border-radius: var(--r-sm); font-family: var(--font-b); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; flex-shrink: 0; }
+    .action-btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-2); }
+    .action-btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+    .action-btn-danger { background: transparent; border: 1px solid transparent; color: var(--text-3); }
+    .action-btn-danger:hover { border-color: rgba(255,77,109,.35); color: var(--danger); background: var(--danger-dim); }
+    .action-btn-primary { background: var(--accent); border: 1px solid var(--accent); color: #0f1117; }
+    .action-btn-primary:hover { background: var(--accent-h); }
+
+    /* ── Storage bar ── */
+    .storage-bar-wrap { padding: 16px 18px; border-top: 1px solid var(--border); }
+    .storage-bar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .storage-bar-label { font-size: 12px; color: var(--text-3); font-weight: 500; }
+    .storage-bar-value { font-size: 12px; color: var(--text-2); font-weight: 600; }
+    .storage-track { width: 100%; height: 4px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+    .storage-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width .5s ease; }
+
+    /* ── Save bar ── */
+    .save-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; transform: translateY(100%); transition: transform .25s cubic-bezier(.34,1.56,.64,1); z-index: 100; }
+    .save-bar.visible { transform: translateY(0); }
+    .save-bar-text { font-size: 13px; color: var(--text-2); }
+    .save-bar-actions { display: flex; gap: 8px; }
+
+    /* ── Toast ── */
+    .settings-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-60px); background: var(--surface-2); border: 1px solid var(--success); border-radius: var(--r-md); padding: 10px 18px; font-size: 13px; font-weight: 600; color: var(--success); z-index: 200; transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .3s; opacity: 0; white-space: nowrap; }
+    .settings-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+    /* ── About ── */
+    .about-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 20px 18px; display: flex; align-items: center; gap: 16px; }
+    .about-app-icon { width: 52px; height: 52px; background: var(--accent); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; box-shadow: 0 4px 16px rgba(245,166,35,.3); }
+    .about-app-name { font-family: var(--font-d); font-size: 18px; font-weight: 800; color: var(--text-1); }
+    .about-app-sub { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+    .about-version { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--text-3); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 4px 10px; flex-shrink: 0; }
+
+    @media (max-width: 520px) {
+      .swatch { width: 24px; height: 24px; }
+      .setting-row { padding: 13px 14px; }
+      .save-bar { padding: 12px 14px; }
+      .theme-options { gap: 4px; }
+      .theme-btn { padding: 0 10px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+<main class="app" style="padding-bottom: 100px;">
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0;">
+    <a href="index.html" class="nav-back" style="margin-bottom:32px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Back to tracker
+    </a>
+    <a href="records.html" class="nav-back" style="margin-bottom:32px;">
+      Records
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </a>
+  </div>
+
+  <header class="tracker-header">
+    <div>
+      <p class="eyebrow">Preferences</p>
+      <h1>Settings</h1>
+    </div>
+  </header>
+
+  <!-- APPEARANCE -->
+  <section class="settings-section">
+    <div class="section-title">Appearance</div>
+    <div class="setting-card">
+      <div class="setting-row">
+        <div class="setting-icon">🌗</div>
+        <div class="setting-label"><div class="setting-label-text">Theme</div><div class="setting-label-sub">Choose your preferred colour mode</div></div>
+        <div class="theme-options">
+          <button class="theme-btn active" data-theme="dark">Dark</button>
+          <button class="theme-btn" data-theme="light">Light</button>
+          <button class="theme-btn" data-theme="system">Auto</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-icon">🎨</div>
+        <div class="setting-label"><div class="setting-label-text">Accent colour</div><div class="setting-label-sub">Used for highlights and buttons</div></div>
+        <div class="swatch-row" id="swatchRow">
+          <div class="swatch active" data-color="#f5a623" style="background:#f5a623" title="Amber"></div>
+          <div class="swatch" data-color="#00d68f" style="background:#00d68f" title="Mint"></div>
+          <div class="swatch" data-color="#38bdf8" style="background:#38bdf8" title="Sky"></div>
+          <div class="swatch" data-color="#a78bfa" style="background:#a78bfa" title="Violet"></div>
+          <div class="swatch" data-color="#ff4d6d" style="background:#ff4d6d" title="Rose"></div>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-icon">🔡</div>
+        <div class="setting-label"><div class="setting-label-text">Font size</div><div class="setting-label-sub">Base size for the app interface</div></div>
+        <select class="setting-select" id="fontSizeSel">
+          <option value="13">Small</option>
+          <option value="15" selected>Medium</option>
+          <option value="17">Large</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <!-- NOTIFICATIONS -->
+  <section class="settings-section">
+    <div class="section-title">Notifications &amp; Alarms</div>
+    <div class="setting-card">
+      <div class="setting-row">
+        <div class="setting-icon">🔔</div>
+        <div class="setting-label"><div class="setting-label-text">In-app alarm toasts</div><div class="setting-label-sub">Show a toast when an activity is about to start</div></div>
+        <label class="toggle"><input type="checkbox" id="toggleInAppAlarm" checked><span class="toggle-track"></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-icon">🔊</div>
+        <div class="setting-label"><div class="setting-label-text">Alarm sound</div><div class="setting-label-sub">Play audio beep with alarm toast</div></div>
+        <label class="toggle"><input type="checkbox" id="toggleAlarmSound" checked><span class="toggle-track"></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-icon">⏱️</div>
+        <div class="setting-label"><div class="setting-label-text">Default reminder</div><div class="setting-label-sub">Minutes before start (pre-filled in form)</div></div>
+        <input class="setting-input" type="number" id="defaultReminder" min="0" max="60" step="1" value="10">
+      </div>
+      <div class="setting-row">
+        <div class="setting-icon">⌛</div>
+        <div class="setting-label"><div class="setting-label-text">Auto-dismiss toast after</div><div class="setting-label-sub">Seconds before alarm toast disappears</div></div>
+        <select class="setting-select" id="toastDuration">
+          <option value="5">5 s</option>
+          <option value="10" selected>10 s</option>
+          <option value="20">20 s</option>
+          <option value="0">Never</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div class="setting-icon">📲</div>
+        <div class="setting-label"><div class="setting-label-text">Push notifications</div><div class="setting-label-sub" id="pushStatusText">Tap to request permission</div></div>
+        <button class="action-btn action-btn-outline" id="pushPermBtn">Request</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ACTIVITY DEFAULTS -->
+  <section class="settings-section">
+    <div class="section-title">Activity Defaults</div>
+    <div class="setting-card">
+      <div class="setting-row">
+        <div class="setting-icon">🏷️</div>
+        <div class="setting-label"><div class="setting-label-text">Default category</div><div class="setting-label-sub">Pre-selected when adding a new activity</div></div>
+        <select class="setting-select" id="defaultCategory">
+          <option value="health">Health</option>
+          <option value="work">Work</option>
+          <option value="personal">Personal</option>
+          <option value="social">Social</option>
+          <option value="other" selected>Other</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div class="setting-icon">⏳</div>
+        <div class="setting-label"><div class="setting-label-text">Default duration (min)</div><div class="setting-label-sub">Pre-filled duration for new activities</div></div>
+        <input class="setting-input" type="number" id="defaultDuration" min="1" max="480" step="5" value="60">
+      </div>
+      <div class="setting-row">
+        <div class="setting-icon">⚡</div>
+        <div class="setting-label"><div class="setting-label-text">Highlight overdue activities</div><div class="setting-label-sub">Show red tint on activities past their end time</div></div>
+        <label class="toggle"><input type="checkbox" id="toggleOverdue" checked><span class="toggle-track"></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-icon">🔄</div>
+        <div class="setting-label"><div class="setting-label-text">Daily reset time</div><div class="setting-label-sub">Auto-save record and reset checklist</div></div>
+        <select class="setting-select" id="resetTime">
+          <option value="00:00" selected>Midnight</option>
+          <option value="04:00">4:00 AM</option>
+          <option value="06:00">6:00 AM</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <!-- DATA MANAGEMENT -->
+  <section class="settings-section">
+    <div class="section-title">Data Management</div>
+    <div class="setting-card">
+      <div class="setting-row">
+        <div class="setting-icon">📥</div>
+        <div class="setting-label"><div class="setting-label-text">Export as CSV</div><div class="setting-label-sub">Download all activity records as a spreadsheet</div></div>
+        <button class="action-btn action-btn-outline" id="exportCsvBtn">Export</button>
+      </div>
+      <div class="setting-row">
+        <div class="setting-icon">💾</div>
+        <div class="setting-label"><div class="setting-label-text">Backup (JSON)</div><div class="setting-label-sub">Full data backup including settings</div></div>
+        <button class="action-btn action-btn-outline" id="exportJsonBtn">Backup</button>
+      </div>
+      <div class="setting-row">
+        <div class="setting-icon">📤</div>
+        <div class="setting-label"><div class="setting-label-text">Restore from backup</div><div class="setting-label-sub">Import a previously exported JSON backup</div></div>
+        <button class="action-btn action-btn-outline" id="importJsonBtn">Restore</button>
+        <input type="file" id="importFileInput" accept=".json" style="display:none">
+      </div>
+      <div class="storage-bar-wrap">
+        <div class="storage-bar-header">
+          <span class="storage-bar-label">Local storage used</span>
+          <span class="storage-bar-value" id="storageVal">—</span>
+        </div>
+        <div class="storage-track"><div class="storage-fill" id="storageFill" style="width:0%"></div></div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-icon">🗑️</div>
+        <div class="setting-label"><div class="setting-label-text">Clear all records</div><div class="setting-label-sub">Permanently delete saved history</div></div>
+        <button class="action-btn action-btn-danger" id="clearRecordsBtn">Clear</button>
+      </div>
+      <div class="setting-row">
+        <div class="setting-icon">⚠️</div>
+        <div class="setting-label"><div class="setting-label-text">Reset everything</div><div class="setting-label-sub">Delete all activities, records, and settings</div></div>
+        <button class="action-btn action-btn-danger" id="resetAllBtn">Reset all</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="settings-section">
+    <div class="section-title">About</div>
+    <div class="about-card">
+      <div class="about-app-icon">📋</div>
+      <div>
+        <div class="about-app-name">D.A.Tracker</div>
+        <div class="about-app-sub">Daily Activity Tracker · PWA</div>
+      </div>
+      <div class="about-version">v1.0</div>
+    </div>
+  </section>
+
+</main>
+
+<div class="save-bar" id="saveBar">
+  <span class="save-bar-text">You have unsaved changes</span>
+  <div class="save-bar-actions">
+    <button class="action-btn action-btn-outline" id="discardBtn">Discard</button>
+    <button class="action-btn action-btn-primary" id="saveBtn">Save settings</button>
+  </div>
+</div>
+
+<div class="settings-toast" id="settingsToast">✓ Settings saved</div>
+
+<script>
+const SETTINGS_KEY   = 'daTrackerSettings';
+const RECORDS_KEY    = 'activityRecords';
+const ACTIVITIES_KEY = 'dailyActivities';
+
+const DEFAULTS = {
+  theme: 'dark', accent: '#f5a623', fontSize: '15',
+  inAppAlarm: true, alarmSound: true,
+  defaultReminder: 10, toastDuration: 10,
+  defaultCategory: 'other', defaultDuration: 60,
+  highlightOverdue: true, resetTime: '00:00'
+};
+
+function loadSettings() {
+  try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
+  catch(_) { return Object.assign({}, DEFAULTS); }
+}
+
+function lighten(hex) {
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return '#'+[Math.min(255,r+51),Math.min(255,g+51),Math.min(255,b+51)].map(function(v){return v.toString(16).padStart(2,'0');}).join('');
+}
+
+function applyAll(s) {
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = s.theme === 'dark' || (s.theme === 'system' && prefersDark);
+  document.body.classList.toggle('theme-light', !dark);
+  document.documentElement.style.setProperty('--accent', s.accent);
+  document.documentElement.style.setProperty('--accent-dim', s.accent + '22');
+  document.documentElement.style.setProperty('--accent-h', lighten(s.accent));
+  document.body.style.fontSize = s.fontSize + 'px';
+}
+
+function populateControls(s) {
+  document.querySelectorAll('.theme-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.theme === s.theme); });
+  document.querySelectorAll('.swatch').forEach(function(sw){ sw.classList.toggle('active', sw.dataset.color === s.accent); });
+  document.getElementById('fontSizeSel').value       = s.fontSize;
+  document.getElementById('defaultReminder').value   = s.defaultReminder;
+  document.getElementById('toastDuration').value     = s.toastDuration;
+  document.getElementById('defaultCategory').value   = s.defaultCategory;
+  document.getElementById('defaultDuration').value   = s.defaultDuration;
+  document.getElementById('resetTime').value         = s.resetTime;
+  document.getElementById('toggleInAppAlarm').checked = s.inAppAlarm;
+  document.getElementById('toggleAlarmSound').checked = s.alarmSound;
+  document.getElementById('toggleOverdue').checked    = s.highlightOverdue;
+  updatePushButton();
+  calcStorage();
+}
+
+let saved   = loadSettings();
+let current = Object.assign({}, saved);
+let dirty   = false;
+
+// Apply on page load
+applyAll(saved);
+populateControls(saved);
+
+function markDirty() { dirty = true; document.getElementById('saveBar').classList.add('visible'); }
+
+function collectCurrent() {
+  current.theme           = (document.querySelector('.theme-btn.active') || {dataset:{theme:'dark'}}).dataset.theme;
+  current.accent          = (document.querySelector('.swatch.active') || {dataset:{color:'#f5a623'}}).dataset.color;
+  current.fontSize        = document.getElementById('fontSizeSel').value;
+  current.inAppAlarm      = document.getElementById('toggleInAppAlarm').checked;
+  current.alarmSound      = document.getElementById('toggleAlarmSound').checked;
+  current.defaultReminder = Number(document.getElementById('defaultReminder').value);
+  current.toastDuration   = Number(document.getElementById('toastDuration').value);
+  current.defaultCategory = document.getElementById('defaultCategory').value;
+  current.defaultDuration = Number(document.getElementById('defaultDuration').value);
+  current.highlightOverdue = document.getElementById('toggleOverdue').checked;
+  current.resetTime       = document.getElementById('resetTime').value;
+}
+
+document.getElementById('saveBtn').addEventListener('click', function() {
+  collectCurrent();
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(current));
+  saved = Object.assign({}, current);
+  dirty = false;
+  document.getElementById('saveBar').classList.remove('visible');
+  applyAll(current);
+  showToast('✓ Settings saved');
+});
+
+document.getElementById('discardBtn').addEventListener('click', function() {
+  current = Object.assign({}, saved);
+  populateControls(current);
+  applyAll(current);
+  dirty = false;
+  document.getElementById('saveBar').classList.remove('visible');
+});
+
+/* Theme buttons */
+document.querySelectorAll('.theme-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.theme-btn').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    applyAll(Object.assign({}, current, {theme: btn.dataset.theme}));
+    markDirty();
+  });
+});
+
+/* Swatches */
+document.querySelectorAll('.swatch').forEach(function(sw) {
+  sw.addEventListener('click', function() {
+    document.querySelectorAll('.swatch').forEach(function(s){ s.classList.remove('active'); });
+    sw.classList.add('active');
+    applyAll(Object.assign({}, current, {accent: sw.dataset.color}));
+    markDirty();
+  });
+});
+
+/* All other controls */
+['fontSizeSel','defaultReminder','toastDuration','defaultCategory','defaultDuration','resetTime',
+ 'toggleInAppAlarm','toggleAlarmSound','toggleOverdue'].forEach(function(id) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', function() {
+    if (id === 'fontSizeSel') document.body.style.fontSize = el.value + 'px';
+    markDirty();
+  });
+});
+
+/* Push */
+function updatePushButton() {
+  const btn=document.getElementById('pushPermBtn'), sub=document.getElementById('pushStatusText');
+  if (!('Notification' in window)) { btn.textContent='Unsupported'; btn.disabled=true; return; }
+  const perm=Notification.permission;
+  if (perm==='granted') { btn.textContent='Granted ✓'; btn.disabled=true; sub.textContent='Push notifications are enabled'; }
+  else if (perm==='denied') { btn.textContent='Blocked'; btn.disabled=true; sub.textContent='Blocked in browser — update site permissions'; }
+  else { btn.textContent='Request'; sub.textContent='Tap to allow push notifications'; }
+}
+document.getElementById('pushPermBtn').addEventListener('click', function() {
+  if (Notification.permission!=='default') return;
+  Notification.requestPermission().then(function(){ updatePushButton(); });
+});
+
+/* Storage */
+function calcStorage() {
+  try {
+    let total=0;
+    for (const k in localStorage) { if (localStorage.hasOwnProperty(k)) total+=(localStorage[k].length+k.length)*2; }
+    const kb=(total/1024).toFixed(1), pct=Math.min(100,total/1024/5120*100);
+    document.getElementById('storageVal').textContent=kb+' KB used';
+    document.getElementById('storageFill').style.width=pct+'%';
+    if (pct>70) document.getElementById('storageFill').style.background='var(--danger)';
+  } catch(_){}
+}
+
+/* Export CSV */
+document.getElementById('exportCsvBtn').addEventListener('click', function() {
+  const records=JSON.parse(localStorage.getItem(RECORDS_KEY)||'{}'), keys=Object.keys(records).sort();
+  const rows=[['Date','Activity','Category','Start','End','Duration (min)','Completed','Notes']];
+  keys.forEach(function(k){ records[k].activities.forEach(function(a){ rows.push([k,a.name,a.category||'other',a.startTime,a.endTime,a.duration||0,a.completed?'Yes':'No',a.notes||'']); }); });
+  const csv=rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  dl(csv,'text/csv','activity-records.csv'); showToast('📥 CSV exported');
+});
+
+/* Backup JSON */
+document.getElementById('exportJsonBtn').addEventListener('click', function() {
+  const backup={exportedAt:new Date().toISOString(),version:'1.0',
+    settings:JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}'),
+    records:JSON.parse(localStorage.getItem(RECORDS_KEY)||'{}'),
+    activities:JSON.parse(localStorage.getItem(ACTIVITIES_KEY)||'[]')};
+  dl(JSON.stringify(backup,null,2),'application/json','datracker-backup.json'); showToast('💾 Backup created');
+});
+
+/* Restore JSON */
+document.getElementById('importJsonBtn').addEventListener('click', function(){ document.getElementById('importFileInput').click(); });
+document.getElementById('importFileInput').addEventListener('change', function(e) {
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try {
+      const backup=JSON.parse(ev.target.result);
+      if(!backup.version) throw new Error('Not a valid backup');
+      if(!confirm('This will replace your current data. Continue?')) return;
+      if(backup.settings)   localStorage.setItem(SETTINGS_KEY,  JSON.stringify(backup.settings));
+      if(backup.records)    localStorage.setItem(RECORDS_KEY,   JSON.stringify(backup.records));
+      if(backup.activities) localStorage.setItem(ACTIVITIES_KEY,JSON.stringify(backup.activities));
+      showToast('✓ Backup restored — reloading…');
+      setTimeout(function(){ location.reload(); },1200);
+    } catch(err){ alert('Could not import: '+err.message); }
+  };
+  reader.readAsText(file); e.target.value='';
+});
+
+/* Clear / Reset */
+document.getElementById('clearRecordsBtn').addEventListener('click', function() {
+  if(!confirm('Delete all activity records permanently?')) return;
+  localStorage.removeItem(RECORDS_KEY); calcStorage(); showToast('🗑️ Records cleared');
+});
+document.getElementById('resetAllBtn').addEventListener('click', function() {
+  if(!confirm('Reset EVERYTHING? All data will be permanently deleted.')) return;
+  localStorage.clear(); showToast('⚠️ All data cleared — reloading…');
+  setTimeout(function(){ location.reload(); },1200);
+});
+
+function dl(content,type,filename) {
+  const blob=new Blob([content],{type}), url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
+}
+
+let toastTimer=null;
+function showToast(msg) {
+  const t=document.getElementById('settingsToast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.classList.remove('show'); },2400);
+}
+
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function(){});
+</script>
+</body>
+</html>
