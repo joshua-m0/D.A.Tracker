@@ -11,7 +11,22 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Tracker">
-  <link rel="apple-touch-icon" href="icon-192.svg">
+  <!-- Anti-flash: apply theme + accent before first paint -->
+  <script>
+    (function(){
+      try {
+        var s = JSON.parse(localStorage.getItem('daTrackerSettings') || '{}');
+        var accent = s.accent || '#f5a623';
+        var theme  = s.theme  || 'dark';
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var dark = theme === 'dark' || (theme === 'system' && prefersDark);
+        if (!dark) document.documentElement.classList.add('theme-light-early');
+        document.documentElement.style.setProperty('--accent', accent);
+        document.documentElement.style.setProperty('--accent-dim', accent + '22');
+        if (s.fontSize) document.documentElement.style.fontSize = s.fontSize + 'px';
+      } catch(_){}
+    })();
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     /* ── View toggle ── */
@@ -159,10 +174,16 @@
 </head>
 <body>
 <main class="app">
-  <a href="index.html" class="nav-back">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-    Back to tracker
-  </a>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0;">
+    <a href="index.html" class="nav-back" style="margin-bottom:32px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Back to tracker
+    </a>
+    <a href="settings.html" class="nav-back" style="margin-bottom:32px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </a>
+  </div>
 
   <header class="tracker-header">
     <div>
@@ -210,6 +231,26 @@
 <script>
 const RECORDS_KEY = 'activityRecords';
 const ACTIVITIES_KEY = 'dailyActivities';
+const SETTINGS_KEY = 'daTrackerSettings';
+
+/* ── Apply settings (theme / accent / font) ── */
+(function applySettingsToPage() {
+  try {
+    var s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    var accent = s.accent || '#f5a623';
+    var theme  = s.theme  || 'dark';
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var dark = theme === 'dark' || (theme === 'system' && prefersDark);
+    document.body.classList.toggle('theme-light', !dark);
+    document.documentElement.style.setProperty('--accent', accent);
+    document.documentElement.style.setProperty('--accent-dim', accent + '22');
+    var r = parseInt(accent.slice(1,3),16), g = parseInt(accent.slice(3,5),16), b = parseInt(accent.slice(5,7),16);
+    var lh = '#' + [Math.min(255,r+51),Math.min(255,g+51),Math.min(255,b+51)]
+      .map(function(v){ return v.toString(16).padStart(2,'0'); }).join('');
+    document.documentElement.style.setProperty('--accent-h', lh);
+    if (s.fontSize) document.body.style.fontSize = s.fontSize + 'px';
+  } catch(_){}
+})();
 const CATEGORIES = {
   health:   { label:'Health',   color:'#00d68f' },
   work:     { label:'Work',     color:'#f5a623' },
