@@ -23,6 +23,19 @@
   --font-b: 'DM Sans', sans-serif;
 }
 
+/* ── Light theme ── */
+body.theme-light,
+html.theme-light-early body {
+  --bg:        #f5f6fa;
+  --surface:   #ffffff;
+  --surface-2: #f0f1f6;
+  --border:    #dde0ec;
+  --border-h:  #b8bdd4;
+  --text-1:    #0f1117;
+  --text-2:    #4a5068;
+  --text-3:    #8b93a8;
+}
+
 body {
   font-family: var(--font-b);
   background: var(--bg);
