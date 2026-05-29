@@ -11,6 +11,22 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Tracker">
+  <!-- Anti-flash: apply theme + accent before first paint -->
+  <script>
+    (function(){
+      try {
+        var s = JSON.parse(localStorage.getItem('daTrackerSettings') || '{}');
+        var accent = s.accent || '#f5a623';
+        var theme  = s.theme  || 'dark';
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var dark = theme === 'dark' || (theme === 'system' && prefersDark);
+        if (!dark) document.documentElement.classList.add('theme-light-early');
+        document.documentElement.style.setProperty('--accent', accent);
+        document.documentElement.style.setProperty('--accent-dim', accent + '22');
+        if (s.fontSize) document.documentElement.style.fontSize = s.fontSize + 'px';
+      } catch(_){}
+    })();
+  </script>
   <!-- iOS uses PNG for home screen icon — generate icon-192.png from your SVG -->
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
@@ -86,6 +102,10 @@
         <a href="records.html" class="records-link">
           Records
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+        <a href="settings.html" class="records-link" title="Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings
         </a>
         <button class="reset-button" type="button" id="resetButton">Reset</button>
       </div>
@@ -266,7 +286,7 @@
     }
 
     function subscribeWebPush() {
-      if (VAPID_PUBLIC_KEY === 'YOUR_VAPID_PUBLIC_KEY_HERE') {
+      if (VAPID_PUBLIC_KEY === 'BL5DlakIw-XzbncrkEabBMfUN3EsEFDyMjYRk7vSRnUxsZtn9Y7LVpkx4JsP3yPjBP9LglR88I5Hzf1wFfz5Z4s') {
         console.log('Web Push: No VAPID key set. Skipping subscription.');
         return;
       }
