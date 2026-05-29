@@ -17,12 +17,74 @@ const alarmTitle          = document.querySelector("#alarmTitle");
 const alarmSub            = document.querySelector("#alarmSub");
 const alarmDismiss        = document.querySelector("#alarmDismiss");
 
-const STORAGE_KEY = "dailyActivities";
-const RECORDS_KEY = "activityRecords";
-const activities  = [];
-let editingIndex  = null;
-let alarmTimeouts = [];   // track scheduled alarms so we can cancel on edit/delete
-let audioCtx      = null; // Web Audio context — created on first user gesture
+const STORAGE_KEY  = "dailyActivities";
+const RECORDS_KEY  = "activityRecords";
+const SETTINGS_KEY = "daTrackerSettings";
+const activities   = [];
+let editingIndex   = null;
+let alarmTimeouts  = [];   // track scheduled alarms so we can cancel on edit/delete
+let audioCtx       = null; // Web Audio context — created on first user gesture
+
+/* ── Settings ── */
+const SETTING_DEFAULTS = {
+  theme:            "dark",
+  accent:           "#f5a623",
+  fontSize:         "15",
+  inAppAlarm:       true,
+  alarmSound:       true,
+  defaultReminder:  10,
+  toastDuration:    10,
+  defaultCategory:  "other",
+  defaultDuration:  60,
+  highlightOverdue: true,
+  resetTime:        "00:00"
+};
+
+function getSettings() {
+  try {
+    return Object.assign({}, SETTING_DEFAULTS,
+      JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"));
+  } catch(_) { return Object.assign({}, SETTING_DEFAULTS); }
+}
+
+function applySettingsToPage() {
+  const s = getSettings();
+
+  // Theme
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const dark = s.theme === "dark" || (s.theme === "system" && prefersDark);
+  document.body.classList.toggle("theme-light", !dark);
+
+  // Accent colour
+  document.documentElement.style.setProperty("--accent",     s.accent);
+  document.documentElement.style.setProperty("--accent-dim", s.accent + "22");
+  // naive lighten for hover
+  const r = parseInt(s.accent.slice(1,3),16),
+        g = parseInt(s.accent.slice(3,5),16),
+        b = parseInt(s.accent.slice(5,7),16);
+  const lh = "#" + [Math.min(255,r+51),Math.min(255,g+51),Math.min(255,b+51)]
+    .map(function(v){ return v.toString(16).padStart(2,"0"); }).join("");
+  document.documentElement.style.setProperty("--accent-h", lh);
+
+  // Font size
+  document.body.style.fontSize = s.fontSize + "px";
+
+  // Pre-fill form defaults (only when fields are empty / untouched)
+  if (activityCatInput && !activityCatInput.dataset.touched) {
+    activityCatInput.value = s.defaultCategory;
+  }
+  if (activityDurInput && !activityDurInput.dataset.touched && !activityDurInput.value) {
+    activityDurInput.placeholder = s.defaultDuration;
+  }
+  if (activityReminderInput && !activityReminderInput.dataset.touched && !activityReminderInput.value) {
+    activityReminderInput.placeholder = s.defaultReminder;
+  }
+}
+
+// Mark fields as "user-touched" so we don't overwrite their edits
+[activityCatInput, activityDurInput, activityReminderInput].forEach(function(el) {
+  if (el) el.addEventListener("change", function() { el.dataset.touched = "1"; });
+});
 
 const CATEGORIES = {
   health:   { label: "Health",   color: "#00d68f" },
@@ -42,6 +104,7 @@ function getAudioCtx() {
 document.addEventListener("click", function() { getAudioCtx(); }, { once: true });
 
 function playAlarm() {
+  if (!getSettings().alarmSound) return;   // respect settings
   try {
     const ctx = getAudioCtx();
     if (ctx.state === "suspended") ctx.resume();
@@ -70,6 +133,7 @@ function playAlarm() {
 
 function showAlarmToast(name, minutesBefore) {
   if (!alarmToast) return;
+  if (!getSettings().inAppAlarm) return;   // respect settings
   alarmTitle.textContent = "⏰ " + name;
   alarmSub.textContent   = minutesBefore === 0
     ? "Starting now!"
@@ -77,8 +141,9 @@ function showAlarmToast(name, minutesBefore) {
   alarmToast.style.display = "flex";
   alarmToast.classList.add("alarm-show");
 
-  // Auto-hide after 10 seconds
-  setTimeout(function() { hideAlarmToast(); }, 10000);
+  // Auto-hide using toastDuration setting (0 = never)
+  const secs = Number(getSettings().toastDuration);
+  if (secs > 0) setTimeout(function() { hideAlarmToast(); }, secs * 1000);
 }
 
 function hideAlarmToast() {
@@ -182,7 +247,7 @@ function fromMins(m) {
   return String(Math.floor(t/60)).padStart(2,"0") + ":" + String(t%60).padStart(2,"0");
 }
 function endTime(start, dur) { return fromMins(toMins(start) + Number(dur)); }
-function isOverdue(a) { return a.endTime < getNow() && !a.completed; }
+function isOverdue(a) { return getSettings().highlightOverdue && a.endTime < getNow() && !a.completed; }
 
 /* ── Storage ── */
 function saveActivities() {
@@ -247,12 +312,24 @@ function updateProgress() {
   updateDonut();
 }
 
+function applyFormDefaults() {
+  const s = getSettings();
+  if (activityCatInput)      activityCatInput.value      = s.defaultCategory;
+  if (activityDurInput)      activityDurInput.placeholder = s.defaultDuration;
+  if (activityReminderInput) activityReminderInput.placeholder = s.defaultReminder;
+  // clear touched flags
+  [activityCatInput, activityDurInput, activityReminderInput].forEach(function(el) {
+    if (el) delete el.dataset.touched;
+  });
+}
+
 /* ── Edit / Delete ── */
 function cancelEdit() {
   editingIndex = null;
   addButton.textContent = "Add Activity";
   addButton.classList.remove("save-button");
   activityForm.reset();
+  applyFormDefaults();
   activityNameInput.focus();
 }
 
@@ -393,7 +470,9 @@ activityForm.addEventListener("submit", function(e) {
     saveEdit(name, start, dur, cat, notes, reminder);
   } else {
     addActivity(name, start, dur, cat, notes, reminder);
-    activityForm.reset(); activityNameInput.focus();
+    activityForm.reset();
+    applyFormDefaults();
+    activityNameInput.focus();
   }
 });
 
@@ -403,7 +482,9 @@ resetButton.addEventListener("click", function() {
   saveActivities(); showActivities();
 });
 
+applySettingsToPage();
 loadActivities(); sortByTime(); showActivities();
+applyFormDefaults();
 scheduleAlarms();
 setInterval(showActivities, 60000);
 scheduleEndOfDaySave();
