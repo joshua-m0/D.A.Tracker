@@ -1,7 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="38" fill="#0f1117"/>
-  <circle cx="96" cy="96" r="67" fill="#f5a623" opacity="0.15"/>
-  <circle cx="96" cy="96" r="52" fill="#f5a623" opacity="0.25"/>
-  <circle cx="96" cy="96" r="37" fill="#f5a623"/>
-  <polyline points="71,96 88,113 123,78" fill="none" stroke="#0f1117" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="42" fill="#f5a623"/>
+  <rect x="42" y="38" width="108" height="123" rx="12" fill="#0f1117"/>
+  <rect x="72" y="25" width="48" height="19" rx="8" fill="#f5a623"/>
+  <!-- line 1 with dot -->
+  <circle cx="57" cy="78" r="8" fill="#f5a623"/>
+  <rect x="72" y="73" width="63" height="9" rx="4.5" fill="#f5a623"/>
+  <!-- line 2 -->
+  <rect x="57" y="96" width="78" height="8" rx="4" fill="#f0f2f8" opacity=".65"/>
+  <!-- line 3 -->
+  <rect x="57" y="112" width="60" height="8" rx="4" fill="#f0f2f8" opacity=".65"/>
+  <!-- line 4 -->
+  <rect x="57" y="128" width="78" height="8" rx="4" fill="#f0f2f8" opacity=".65"/>
+  <!-- line 5 short -->
+  <rect x="57" y="144" width="42" height="8" rx="4" fill="#f0f2f8" opacity=".4"/>
 </svg>
